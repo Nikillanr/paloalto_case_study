@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Community Guardian</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <div id="splash" class="splash" aria-live="polite">
+      <div class="splash-inner">
+        <div class="logo-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <h1>Community Guardian</h1>
+        <p>Palo Alto Inspired Security Console</p>
+      </div>
+    </div>
+
+    <div class="scan-noise" aria-hidden="true"></div>
+    <div class="angled-pattern" aria-hidden="true"></div>
+
+    <section class="brief-wrap">
+      <div class="brief-copy">
+        <p class="eyebrow">Community Guardian Console</p>
+        <h1>Signal First. Panic Last.</h1>
+        <p>
+          Ingest community threat feed events, prioritize risk, and respond with
+          calm, actionable checklists.
+        </p>
+      </div>
+      <div class="brief-metrics">
+        <article>
+          <span>Feed Events Available</span>
+          <strong id="metric-feed-events">--</strong>
+        </article>
+        <article>
+          <span>Active Incidents</span>
+          <strong id="metric-active">--</strong>
+        </article>
+        <article>
+          <span>High / Critical</span>
+          <strong id="metric-high-risk">--</strong>
+        </article>
+        <article>
+          <span>Next Priority</span>
+          <strong id="metric-next-priority">No pending incidents</strong>
+        </article>
+      </div>
+    </section>
+
+    <main class="layout">
+      <section class="panel form-panel">
+        <h2>Source Feed Controls</h2>
+        <p class="block-note">
+          Primary mode: ingest synthetic incident feed and auto-triage each
+          event.
+        </p>
+        <div class="feed-actions">
+          <button id="import-feed">Import Feed Events</button>
+          <button id="import-reset" class="ghost">
+            Reset + Rebuild From Feed
+          </button>
+        </div>
+        <p id="feed-meta" class="message"></p>
+
+        <hr class="split" />
+
+        <h2>Operator Input (Optional)</h2>
+        <form id="incident-form">
+          <label>
+            Title
+            <input id="title" required minlength="3" maxlength="120" />
+          </label>
+          <label>
+            Description
+            <textarea
+              id="description"
+              required
+              minlength="10"
+              maxlength="2000"
+            ></textarea>
+          </label>
+          <label>
+            Location
+            <input id="location" required minlength="2" maxlength="120" />
+          </label>
+          <button type="submit">Analyze & Save</button>
+        </form>
+        <p id="form-message" class="message"></p>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="panel-head">
+          <h2>Incident Digest</h2>
+          <button id="refresh">Refresh</button>
+        </div>
+        <div class="filters">
+          <input
+            id="search"
+            placeholder="Search title, description, location"
+          />
+          <select id="status-filter">
+            <option value="">All Status</option>
+            <option value="new">New</option>
+            <option value="verified">Verified</option>
+            <option value="ignored">Ignored</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <select id="severity-filter">
+            <option value="">All Severity</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="digest-workspace">
+          <div class="triage-board" id="triage-board">
+            <section class="lane">
+              <h3>New</h3>
+              <div id="lane-new" class="lane-list"></div>
+            </section>
+            <section class="lane">
+              <h3>Verified</h3>
+              <div id="lane-verified" class="lane-list"></div>
+            </section>
+            <section class="lane">
+              <h3>Ignored</h3>
+              <div id="lane-ignored" class="lane-list"></div>
+            </section>
+            <section class="lane">
+              <h3>Resolved</h3>
+              <div id="lane-resolved" class="lane-list"></div>
+            </section>
+          </div>
+
+          <aside class="detail-panel" id="detail-panel">
+            <p class="empty-detail" id="empty-detail">
+              Select an incident from any lane.
+            </p>
+            <div id="detail-content" class="detail-content hidden">
+              <div class="meta-row">
+                <span class="badge severity" id="detail-severity-badge"></span>
+                <span class="badge" id="detail-category"></span>
+                <span class="badge" id="detail-source"></span>
+                <span class="badge" id="detail-entry-mode"></span>
+              </div>
+              <h3 id="detail-title"></h3>
+              <p class="summary" id="detail-summary"></p>
+              <p class="description" id="detail-description"></p>
+              <p class="location" id="detail-location"></p>
+              <ol class="checklist" id="detail-checklist"></ol>
+
+              <div class="detail-controls">
+                <label>
+                  Status
+                  <select id="detail-status">
+                    <option value="new">New</option>
+                    <option value="verified">Verified</option>
+                    <option value="ignored">Ignored</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </label>
+                <label>
+                  Severity Override
+                  <select id="detail-severity">
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </label>
+              </div>
+              <div class="detail-actions">
+                <button id="detail-save">Save Changes</button>
+                <button id="detail-reanalyze" class="ghost">Reanalyze</button>
+              </div>
+              <p class="message" id="detail-message"></p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <template id="incident-template">
+      <article class="incident-card compact">
+        <div class="meta-row">
+          <span class="badge severity"></span>
+          <span class="badge category"></span>
+          <span class="badge source"></span>
+        </div>
+        <h3 class="title"></h3>
+        <p class="summary"></p>
+        <p class="location"></p>
+        <button class="open-detail">Open Incident</button>
+      </article>
+    </template>
+
+    <script src="/static/js/app.js" defer></script>
+  </body>
+</html>

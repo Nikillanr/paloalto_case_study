@@ -1,0 +1,104 @@
+[
+  {
+    "id": 6,
+    "title": "GPAY scam",
+    "description": "Vendors using qr to do trojan attacks",
+    "location": "Bangalore",
+    "category": "general",
+    "severity": "medium",
+    "status": "verified",
+    "summary": "Potential general incident reported in Vendors using qr to do trojan attacks",
+    "checklist": [
+      "Verify the incident source before acting.",
+      "Use unique passwords and MFA across important accounts.",
+      "Share only necessary details with trusted contacts."
+    ],
+    "source": "fallback",
+    "entry_mode": "manual"
+  },
+  {
+    "id": 7,
+    "title": "Phishing campaign targets payroll team",
+    "description": "Staff members received urgent email messages asking them to verify payroll credentials through a login link. Multiple recipients reported similar wording.",
+    "location": "Bengaluru",
+    "category": "phishing",
+    "severity": "high",
+    "status": "new",
+    "summary": "Potential phishing incident reported in Staff members received urgent email messages asking them to verify payroll crede",
+    "checklist": [
+      "Do not click links or download attachments from the message.",
+      "Report the sender and message in your email client.",
+      "Reset your password and enable MFA if any credential was entered."
+    ],
+    "source": "fallback",
+    "entry_mode": "feed"
+  },
+  {
+    "id": 8,
+    "title": "SMS scam impersonating bank support",
+    "description": "Residents are receiving SMS messages that claim debit cards are blocked and ask users to share OTP on a callback number.",
+    "location": "Hyderabad",
+    "category": "phishing",
+    "severity": "low",
+    "status": "new",
+    "summary": "Potential phishing incident reported in Residents are receiving SMS messages that claim debit cards are blocked and ask ",
+    "checklist": [
+      "Do not click links or download attachments from the message.",
+      "Report the sender and message in your email client.",
+      "Reset your password and enable MFA if any credential was entered."
+    ],
+    "source": "fallback",
+    "entry_mode": "feed"
+  },
+  {
+    "id": 9,
+    "title": "Public notice mentions leaked customer records",
+    "description": "A local retail chain posted an incident note saying customer contact records may have been exposed due to unauthorized database access.",
+    "location": "Mumbai",
+    "category": "data_breach",
+    "severity": "low",
+    "status": "new",
+    "summary": "Potential data breach incident reported in A local retail chain posted an incident note saying customer contact records may",
+    "checklist": [
+      "Rotate passwords for impacted accounts immediately.",
+      "Enable MFA and review recent account sign-ins.",
+      "Monitor financial and personal accounts for suspicious activity."
+    ],
+    "source": "fallback",
+    "entry_mode": "feed"
+  },
+  {
+    "id": 10,
+    "title": "False outage restoration calls reported",
+    "description": "Following an ISP outage, callers pretending to be technicians are asking for remote access and payment to restore internet services.",
+    "location": "Pune",
+    "category": "general",
+    "severity": "low",
+    "status": "new",
+    "summary": "Potential general incident reported in Following an ISP outage, callers pretending to be technicians are asking for rem",
+    "checklist": [
+      "Verify the incident source before acting.",
+      "Use unique passwords and MFA across important accounts.",
+      "Share only necessary details with trusted contacts."
+    ],
+    "source": "fallback",
+    "entry_mode": "feed"
+  },
+  {
+    "id": 11,
+    "title": "Chemical storage warning for nearby block",
+    "description": "City authority bulletin warns residents about a temporary chemical hazard near the industrial zone and advises route restrictions.",
+    "location": "Chennai",
+    "category": "local_hazard",
+    "severity": "low",
+    "status": "new",
+    "summary": "Potential local hazard incident reported in City authority bulletin warns residents about a temporary chemical hazard near t",
+    "checklist": [
+      "Follow official local authority alerts and routes.",
+      "Share your status with your trusted safety circle.",
+      "Avoid unverified social media instructions."
+    ],
+    "source": "fallback",
+    "entry_mode": "feed"
+  }
+]
