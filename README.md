@@ -1,3 +1,25 @@
+# Instructions
+Dear Candidate,
+
+Thank you again for your interest in the IT role at Palo Alto Networks. We were impressed with your application and are excited to move forward with the next step: the Case Study Challenge.
+
+This is a take-home assignment designed to assess your practical skills and problem-solving approach. You have until March 20th at 6:00 PM IST to complete and submit your solution. Please do not add to or edit your repo after the submission deadline. 
+
+The cases and detailed instructions are attached to this email. Please read them carefully and select one to complete. Once you have completed all required components for the case, submit your work using this Google Form. The instructions for submitting are also included in the Google Form.
+
+Your final submission must include the following three components:
+
+Submission Requirements
+Working Prototype/Demo: A functional application that demonstrates your chosen MVP features. This can be a web app, a command-line tool, or a compelling interactive simulation.
+
+Presentation (5-7 minutes): A concise screen recording covering the problem, your solution's core features, a live demonstration, and your key learnings and challenges.
+
+Design Documentation: A document outlining your design choices, the technical stack used (programming languages, libraries, AI models), and potential future enhancements.
+
+We look forward to seeing your solution. We will review your case study and should have an update on next steps in the comming week.
+
+Good luck!
+
 # Community Guardian - Palo Alto Case Study
 
 Candidate Name: Nikillan  
