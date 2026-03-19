@@ -1,0 +1,86 @@
+[
+  {
+    "title": "Phishing campaign targets payroll team",
+    "description": "Staff members received urgent email messages asking them to verify payroll credentials through a login link. Multiple recipients reported similar wording and the link redirects to a credential harvesting page.",
+    "location": "Bengaluru",
+    "source": "community_forum",
+    "reported_at": "2026-03-17T09:15:00Z"
+  },
+  {
+    "title": "WhatsApp credential phishing via fake HR portal",
+    "description": "Employees at several companies reported WhatsApp messages containing links to a fake HR benefits portal asking for login credentials and Aadhaar numbers. The phishing page closely mimics a real enterprise portal.",
+    "location": "Pune",
+    "source": "corporate_alert",
+    "reported_at": "2026-03-17T14:30:00Z"
+  },
+  {
+    "title": "Customer records leaked from retail chain database",
+    "description": "A local retail chain confirmed that customer contact records including names, phone numbers, and email addresses were exposed due to unauthorized database access. Approximately 50,000 records may be affected.",
+    "location": "Mumbai",
+    "source": "city_notice",
+    "reported_at": "2026-03-17T13:30:00Z"
+  },
+  {
+    "title": "Healthcare patient data exposed on dark web",
+    "description": "Patient records from a regional hospital network have appeared on a dark web marketplace. The leaked data includes patient names, medical histories, and insurance details. The breach is under active investigation.",
+    "location": "Chennai",
+    "source": "security_researcher",
+    "reported_at": "2026-03-18T06:45:00Z"
+  },
+  {
+    "title": "UPI fraud via fake payment app update",
+    "description": "Fraudsters are circulating a fake UPI app update link via SMS that installs a malicious overlay on banking apps. Victims report unauthorized money transfers after installing the fake update.",
+    "location": "Kolkata",
+    "source": "cybercrime_helpline",
+    "reported_at": "2026-03-17T16:20:00Z"
+  },
+  {
+    "title": "Fake job offer scam collecting personal documents",
+    "description": "A fraudulent recruitment campaign is targeting job seekers with offers from well-known IT companies. Victims are asked to submit identity documents and pay a registration fee. Several candidates have lost money and had their identities compromised.",
+    "location": "Noida",
+    "source": "job_board_alert",
+    "reported_at": "2026-03-18T11:15:00Z"
+  },
+  {
+    "title": "Chemical spill near industrial zone",
+    "description": "City authority bulletin warns residents about a hazardous chemical spill near the industrial zone following a tanker accident. Emergency services are on site and residents within a 2km radius are advised to evacuate immediately.",
+    "location": "Chennai",
+    "source": "municipal_alert",
+    "reported_at": "2026-03-17T18:05:00Z"
+  },
+  {
+    "title": "Flash flooding warning after heavy rainfall",
+    "description": "Meteorological department has issued a flood warning for low-lying areas following 3 days of continuous heavy rainfall. Water levels in local rivers are rising rapidly and several roads are already waterlogged.",
+    "location": "Kochi",
+    "source": "weather_service",
+    "reported_at": "2026-03-18T05:00:00Z"
+  },
+  {
+    "title": "Public WiFi man-in-the-middle attack at railway station",
+    "description": "Security researchers have identified a rogue WiFi access point at the main railway station performing man-in-the-middle attacks. Users connecting to the fake hotspot have their web traffic intercepted, potentially exposing login credentials and financial data.",
+    "location": "Delhi",
+    "source": "security_researcher",
+    "reported_at": "2026-03-17T20:00:00Z"
+  },
+  {
+    "title": "Ransomware attack hits local government offices",
+    "description": "Multiple local government office systems have been encrypted by ransomware. The attack is spreading through the network and has disabled citizen services including property registration and utility payments. Immediate containment measures are underway.",
+    "location": "Lucknow",
+    "source": "govt_advisory",
+    "reported_at": "2026-03-18T08:45:00Z"
+  },
+  {
+    "title": "Suspicious vehicle reported near school campus",
+    "description": "Parents and school staff have reported a suspicious unmarked vehicle repeatedly circling the school campus during drop-off and pick-up times over the past three days. Police have been notified and are monitoring the situation.",
+    "location": "Gurugram",
+    "source": "neighborhood_watch",
+    "reported_at": "2026-03-18T09:00:00Z"
+  },
+  {
+    "title": "Event ticket scam for upcoming cricket match",
+    "description": "Fake websites are selling counterfeit tickets for the upcoming IPL cricket match at inflated prices. Multiple buyers have reported receiving no tickets after making payment through these unauthorized portals.",
+    "location": "Mumbai",
+    "source": "consumer_forum",
+    "reported_at": "2026-03-18T14:00:00Z"
+  }
+]

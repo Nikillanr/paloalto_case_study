@@ -1,80 +1,158 @@
-# Design Documentation - Community Guardian
+# Design Documentation — Community Guardian
 
-## 1. Objective
+## 1. Problem Analysis
 
-Build a focused prototype that converts noisy community safety reports into concise, actionable guidance with transparent AI usage and a reliable fallback path.
+Community safety information is fragmented across news sites, social media, and local channels. This fragmentation creates two failure modes:
+
+1. **Alert fatigue**: Too many unfiltered reports cause people to disengage
+2. **Missed signals**: Critical threats get lost in noise
+
+Community Guardian addresses this by acting as a **noise-to-signal filter** — ingesting raw community reports, applying AI analysis to classify and prioritize them, and presenting **calm, actionable safety digests** with clear next steps.
+
+This problem is architecturally identical to what Palo Alto Networks' Cortex XSIAM solves at enterprise scale: converting raw security telemetry into prioritized incidents with automated response recommendations.
 
 ## 2. Architecture
 
-- **Frontend**: Server-rendered HTML + vanilla JavaScript + custom CSS.
-- **Backend**: FastAPI REST API.
-- **Storage**:
-  - Feed source: `data/feed_events.json` (synthetic external-like event source)
-  - Incident store: `data/incidents.json` (triaged digest output)
-- **AI Layer**:
-  - Primary: OpenAI chat completion via HTTPS.
-  - Fallback: Rule-based classifier using keyword heuristics.
+### Tech Stack
+
+| Component | Technology | Rationale |
+|-----------|-----------|-----------|
+| Backend | FastAPI (Python) | Modern async framework, auto-generated OpenAPI docs, Pydantic validation |
+| Database | SQLite | Zero-config, ACID-compliant, proper SQL querying — better than file-based JSON |
+| AI | Groq Llama 3.1 8B Instant | Free tier with 500K daily tokens, fast inference (~0.5s), OpenAI-compatible API |
+| Fallback | Weighted keyword classifier | Deterministic, always available, no external dependencies |
+| Frontend | Vanilla JS + CSS | Zero build step, easy to clone and run, no framework overhead |
+| Testing | Pytest + FastAPI TestClient | Standard Python testing with in-memory SQLite isolation |
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Dashboard UI                     │
+│    Stats | Feed Import | Incident List | Detail   │
+└───────────────────┬─────────────────────────────┘
+                    │ REST API (JSON)
+┌───────────────────┴─────────────────────────────┐
+│               FastAPI Application                 │
+│                                                   │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │ Feed     │  │ AI       │  │ Incident      │  │
+│  │ Service  │→ │ Pipeline │→ │ Service (DB)  │  │
+│  └──────────┘  └────┬─────┘  └───────────────┘  │
+│                     │                             │
+│              ┌──────┴──────┐                     │
+│              │  Groq API?  │                     │
+│              │  ↓Yes  ↓No  │                     │
+│              │  AI   Fallback│                    │
+│              └─────────────┘                     │
+└──────────────────────────────────────────────────┘
+```
 
 ## 3. Core Flow
 
-1. User triggers feed import from the dashboard.
-2. Backend loads synthetic source events from `feed_events.json`.
-3. Each event is normalized and deduplicated.
-4. Backend attempts AI analysis (category, severity, summary, 3-step checklist).
-5. If AI is unavailable/invalid, backend executes fallback rules.
-6. Incidents are persisted with `source` metadata (`ai` or `fallback`).
-7. User reviews digest, filters incidents, updates status, and can reanalyze.
-8. Optional operator input path exists for simulation/testing.
+1. User triggers feed import from the dashboard
+2. Feed service loads 12 synthetic events from `seed_events.json`
+3. Events are deduplicated (title + location match check)
+4. Each event passes through the AI pipeline:
+   - If Groq API is available → structured JSON analysis with confidence score
+   - If not → weighted keyword classifier produces deterministic result
+5. Analysis result includes: category, severity, confidence (0-1), summary, checklist, reasoning
+6. Incident is stored in SQLite with full metadata and original reported timestamp
+7. Dashboard updates: stats, incident list, filters
+8. User can review, search/filter, update status, override severity, or trigger reanalysis
 
 ## 4. Data Model
 
-Incident fields:
+### Incident Schema
 
-- `id`: integer
-- `title`: short text
-- `description`: long text
-- `location`: short text
-- `category`: `phishing | data_breach | local_hazard | scam | general`
-- `severity`: `low | medium | high | critical`
-- `status`: `new | verified | ignored | resolved`
-- `summary`: concise interpretation
-- `checklist`: exactly 3 recommended actions
-- `source`: `ai | fallback`
+| Field | Type | Description |
+|-------|------|-------------|
+| id | INTEGER | Auto-incrementing primary key |
+| title | TEXT | Short incident title |
+| description | TEXT | Full incident description |
+| location | TEXT | Geographic area |
+| category | TEXT | phishing, data_breach, scam, local_hazard, network_security, general |
+| severity | TEXT | critical, high, medium, low |
+| confidence | REAL | 0.0-1.0 analysis confidence score |
+| summary | TEXT | AI/fallback-generated summary |
+| checklist | TEXT (JSON) | 3-5 actionable steps |
+| source | TEXT | "ai" or "fallback" |
+| reasoning | TEXT | Explanation of classification logic |
+| entry_mode | TEXT | "feed" or "manual" |
+| status | TEXT | new, verified, resolved, dismissed |
+| created_at | TEXT | ISO 8601 timestamp (preserved from source for feed events) |
+| updated_at | TEXT | ISO 8601 timestamp |
 
-## 5. AI + Fallback Strategy
+## 5. AI Pipeline + Fallback Strategy
 
-- AI is optional and gated by `OPENAI_API_KEY`.
-- Fallback triggers when:
-  - API key is missing,
-  - external call fails,
-  - output schema is invalid.
-- Fallback guarantees deterministic behavior and always produces required fields.
+### AI Path (Groq / Llama 3.1 8B Instant)
+- OpenAI-compatible API via Groq (free tier: 500K tokens/day, 30 RPM)
+- Structured system prompt requesting JSON with specific fields
+- Uses `response_format: json_object` for reliable parsing
+- Temperature 0.3 for consistent, factual output
+- 20-second timeout to prevent blocking
+- Retry logic: 3 attempts on HTTP 429, respects `retry-after` header
+- **Daily limit detection**: if Groq returns a "tokens per day" error, the app immediately stops retrying and falls back to classifier. The UI shows "AI Quota Exhausted" status
+- Response validation: checks all required fields present, clamps confidence to 0-1
 
-## 6. Validation and Error Handling
+### Fallback Path (Weighted Keyword Classifier)
+- **Category detection**: Weighted keyword dictionaries per category (17+ keywords each). Score = sum of matched keyword weights. Highest-scoring category wins.
+- **Severity detection**: Priority-ordered keyword sets (critical → high → medium → low). First level with matches wins.
+- **Confidence calculation**: `min(0.95, max(0.3, score / max_possible * 2.5))` — ensures confidence stays in a realistic range.
+- **Summary generation**: Category-specific templates incorporating key details (location, first sentence of description).
+- **Checklist**: Pre-written, category-specific 3-5 step action plans.
+- **Reasoning**: Auto-generated text explaining which keywords triggered the classification.
 
-- Pydantic validation enforces input constraints.
-- API returns structured validation errors on malformed payloads.
-- Not-found and invalid update operations return clear HTTP errors.
+### Fallback Triggers
+1. No GROQ_API_KEY configured
+2. AI_ENABLED set to false
+3. User selects "Fallback Only" mode in UI
+4. Groq API returns an error or times out
+5. Daily token limit exhausted
+6. Response fails schema validation
 
-## 7. Testing
+### Global Engine Toggle
+The dashboard header includes a global analysis engine selector (Auto / AI Only / Fallback Only) that affects all operations:
+- Feed imports: all events analyzed with selected engine
+- Manual reports: submitted with selected engine
+- Reanalysis: individual incidents re-processed with selected engine
+- On mode switch + reimport: existing manual entries are reanalyzed to match the new mode (e.g. switching from AI to Fallback reanalyzes AI-sourced manual entries with fallback)
 
-Implemented tests:
+## 6. Confidence Scoring Design
 
-- **Happy path**: create incident and verify it appears in listing.
-- **Edge case**: invalid short input rejected with HTTP 422.
-- **Source flow**: preview + import feed events and verify incidents are created.
+Confidence is a key differentiator for responsible AI:
 
-## 8. Security and Responsible AI
+- **AI source**: Confidence is self-reported by the LLM (0-1), clamped to valid range
+- **Fallback source**: Computed as keyword match density relative to maximum possible score
+- **UI representation**: Colored progress bar + percentage (green ≥80%, yellow ≥60%, orange ≥40%, red <40%)
+- **Purpose**: Users can quickly assess how much to trust the automated analysis and whether to reanalyze or manually override
 
-- No secrets committed; `.env.example` provided.
-- Synthetic data only.
-- Transparent source labeling (`ai` vs `fallback`).
-- Human control retained through status updates and reanalysis.
+## 7. Security Considerations
+
+- API keys stored in `.env` (not committed to repo)
+- `.env.example` provided for setup guidance
+- All data is synthetic — no real personal information
+- Input validation via Pydantic with min/max length constraints
+- Text escaping in frontend to prevent XSS
+- SQLite with parameterized queries to prevent SQL injection
+
+## 8. Testing Strategy
+
+- **21 tests total** (11 API + 10 classifier)
+- **In-memory SQLite** for test isolation (no file cleanup needed)
+- **AI disabled in tests** (`AI_ENABLED=false`) — tests use fallback only, no API calls needed
+- **API tests**: CRUD operations, validation, feed import, dedup, search, stats, manual entry survival on reset
+- **Classifier tests**: Category detection, severity detection, confidence range, reasoning, edge cases
 
 ## 9. Future Enhancements
 
-- Confidence scoring with explainability cards.
-- Source reliability ranking and stronger cross-source deduplication.
-- Auth + role-based permissions.
-- Notification channels (email/SMS/push) and escalation logic.
-- Postgres storage with migration support.
+| Priority | Enhancement | Effort |
+|----------|------------|--------|
+| High | PostgreSQL migration for production scale | Medium |
+| High | User authentication and role-based access | Medium |
+| Medium | Real-time WebSocket updates for live feeds | Medium |
+| Medium | Source reliability scoring and weighting | Low |
+| Medium | Confidence threshold alerts (auto-flag for human review) | Low |
+| Low | Notification channels (email, SMS, push) | High |
+| Low | Geographic visualization (map view) | Medium |
+| Low | Larger AI model (70B) on paid Groq tier for higher quality | Low |

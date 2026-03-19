@@ -1,99 +1,175 @@
-from fastapi.testclient import TestClient
-import pytest
+"""API endpoint tests — covers CRUD, feed import, search/filter, and stats."""
 
-from app.main import app, store
+import os
+import pytest
+from fastapi.testclient import TestClient
+
+# Point database to a temp file before importing app
+os.environ["DATABASE_PATH"] = ":memory:"
+os.environ["AI_ENABLED"] = "false"  # Tests use fallback — no API calls
+
+from app.main import app
+from app import database as db
 
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def isolated_store(tmp_path):
-    original_path = store.path
-    temp_data = tmp_path / "incidents.json"
-    temp_data.write_text("[]", encoding="utf-8")
-    store.path = temp_data
+def fresh_db():
+    """Reset the database for each test."""
+    db.reset_db()
     yield
-    store.path = original_path
 
 
-def test_create_incident_happy_path() -> None:
+# ── Happy Path Tests ──────────────────────────────────────────────────
+
+def test_health():
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert "ai_available" in body
+
+
+def test_create_incident_happy_path():
     payload = {
-        "title": "Phishing text alert",
-        "description": "User received a message asking for bank OTP and password verification.",
+        "title": "Phishing email targeting employees",
+        "description": "Staff received urgent emails asking to verify payroll credentials through a fake login page.",
+        "location": "Bengaluru",
+    }
+    resp = client.post("/api/incidents", json=payload)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["id"] >= 1
+    assert body["title"] == payload["title"]
+    assert body["category"] in {"phishing", "scam", "data_breach", "local_hazard", "network_security", "general"}
+    assert body["confidence"] > 0
+    assert body["source"] in {"ai", "fallback"}
+    assert len(body["checklist"]) > 0
+    assert body["reasoning"] != ""
+    assert body["status"] == "new"
+    assert body["entry_mode"] == "manual"
+
+    # Verify it appears in the list
+    list_resp = client.get("/api/incidents")
+    assert list_resp.status_code == 200
+    assert list_resp.json()["total"] == 1
+
+
+# ── Validation Tests ──────────────────────────────────────────────────
+
+def test_create_incident_validation_error():
+    payload = {"title": "Hi", "description": "short", "location": "X"}
+    resp = client.post("/api/incidents", json=payload)
+    assert resp.status_code == 422
+
+
+# ── Feed Import Tests ─────────────────────────────────────────────────
+
+def test_feed_preview():
+    resp = client.get("/api/feed/preview")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] >= 10
+    assert len(body["samples"]) == 3
+
+
+def test_import_feed():
+    resp = client.post("/api/feed/import", json={"max_items": 5, "reset_existing": False})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["imported"] == 5
+    assert body["total_incidents"] == 5
+
+
+def test_import_feed_dedup():
+    """Importing the same events twice should not create duplicates."""
+    client.post("/api/feed/import", json={"max_items": 3, "reset_existing": False})
+    resp2 = client.post("/api/feed/import", json={"max_items": 3, "reset_existing": False})
+    body = resp2.json()
+    assert body["imported"] == 0  # All duplicates
+
+
+# ── Search & Filter Tests ─────────────────────────────────────────────
+
+def test_search_filter():
+    # Create two incidents in different locations
+    client.post("/api/incidents", json={
+        "title": "Phishing attack in Pune",
+        "description": "Employees received suspicious emails with credential harvesting links.",
         "location": "Pune",
-    }
+    })
+    client.post("/api/incidents", json={
+        "title": "Gas leak emergency in Mumbai",
+        "description": "Major gas leak reported in residential area, evacuation underway.",
+        "location": "Mumbai",
+    })
 
-    response = client.post("/api/incidents", json=payload)
-    assert response.status_code == 201
-    body = response.json()
-    assert body["id"] == 1
-    assert body["category"] in {"phishing", "scam", "general", "data_breach", "local_hazard"}
+    # Search by text
+    resp = client.get("/api/incidents?search=mumbai")
+    assert resp.json()["total"] == 1
+    assert resp.json()["incidents"][0]["location"] == "Mumbai"
 
-    list_response = client.get("/api/incidents")
-    assert list_response.status_code == 200
-    assert len(list_response.json()) == 1
-
-
-def test_create_incident_validation_edge_case() -> None:
-    payload = {
-        "title": "Hi",
-        "description": "short",
-        "location": "X",
-    }
-
-    response = client.post("/api/incidents", json=payload)
-    assert response.status_code == 422
+    # Filter by severity — both incidents exist
+    all_resp = client.get("/api/incidents")
+    assert all_resp.json()["total"] == 2
 
 
-def test_import_feed_data_source_flow() -> None:
-    preview_response = client.get("/api/feed/preview")
-    assert preview_response.status_code == 200
-    preview_body = preview_response.json()
-    assert preview_body["events_available"] >= 1
+# ── Update Tests ──────────────────────────────────────────────────────
 
-    import_response = client.post(
-        "/api/feed/import",
-        json={"reset_existing": True, "max_items": 3},
-    )
-    assert import_response.status_code == 200
-    import_body = import_response.json()
-    assert import_body["imported"] >= 1
-    assert import_body["total_incidents"] >= 1
+def test_update_incident():
+    create_resp = client.post("/api/incidents", json={
+        "title": "Test incident for update",
+        "description": "This is a test incident that we will update the status of.",
+        "location": "Delhi",
+    })
+    inc_id = create_resp.json()["id"]
 
-    list_response = client.get("/api/incidents")
-    assert list_response.status_code == 200
-    assert len(list_response.json()) == import_body["total_incidents"]
+    resp = client.put(f"/api/incidents/{inc_id}", json={"status": "verified", "severity": "critical"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "verified"
+    assert resp.json()["severity"] == "critical"
 
 
-def test_manual_entry_survives_feed_reset_and_severity_override() -> None:
-    manual_response = client.post(
-        "/api/incidents",
-        json={
-            "title": "Manual suspicious call report",
-            "description": "Caller claimed to be from tax office and requested immediate UPI payment.",
-            "location": "Delhi",
-        },
-    )
-    assert manual_response.status_code == 201
-    manual_body = manual_response.json()
-    assert manual_body["entry_mode"] == "manual"
+def test_update_nonexistent_incident():
+    resp = client.put("/api/incidents/99999", json={"status": "verified"})
+    assert resp.status_code == 404
 
-    update_response = client.put(
-        f"/api/incidents/{manual_body['id']}",
-        json={"status": "verified", "severity": "critical"},
-    )
-    assert update_response.status_code == 200
-    updated = update_response.json()
-    assert updated["status"] == "verified"
-    assert updated["severity"] == "critical"
 
-    import_response = client.post(
-        "/api/feed/import",
-        json={"reset_existing": True, "max_items": 2},
-    )
-    assert import_response.status_code == 200
+# ── Stats Tests ───────────────────────────────────────────────────────
 
-    all_incidents = client.get("/api/incidents").json()
-    manual_ids = [i["id"] for i in all_incidents if i["entry_mode"] == "manual"]
-    assert manual_body["id"] in manual_ids
+def test_stats():
+    # Import some events to get stats
+    client.post("/api/feed/import", json={"max_items": 5, "reset_existing": False})
+
+    resp = client.get("/api/stats")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 5
+    assert isinstance(body["by_severity"], dict)
+    assert isinstance(body["by_category"], dict)
+    assert isinstance(body["by_source"], dict)
+    assert body["avg_confidence"] > 0
+
+
+# ── Feed Reset Preserves Manual Entries ───────────────────────────────
+
+def test_manual_survives_feed_reset():
+    # Create manual incident
+    manual = client.post("/api/incidents", json={
+        "title": "Manual report about suspicious activity",
+        "description": "Suspicious individual spotted near the school campus multiple times.",
+        "location": "Gurugram",
+    }).json()
+
+    # Import feed
+    client.post("/api/feed/import", json={"max_items": 3, "reset_existing": False})
+
+    # Reset and reimport
+    client.post("/api/feed/import", json={"max_items": 3, "reset_existing": True})
+
+    # Manual entry should still exist
+    all_resp = client.get("/api/incidents")
+    ids = [i["id"] for i in all_resp.json()["incidents"]]
+    assert manual["id"] in ids

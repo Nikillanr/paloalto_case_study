@@ -3,206 +3,265 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Community Guardian</title>
+    <title>Community Guardian — Security Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/styles.css" />
   </head>
   <body>
-    <div id="splash" class="splash" aria-live="polite">
-      <div class="splash-inner">
-        <div class="logo-mark" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
-        <h1>Community Guardian</h1>
-        <p>Palo Alto Inspired Security Console</p>
+    <!-- Splash Screen -->
+    <div class="splash" id="splash">
+      <div class="splash-logo">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"
+                fill="rgba(59,130,246,0.06)" stroke="#3B82F6" stroke-width="1" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                stroke-dasharray="12" stroke-dashoffset="12"
+                style="animation: draw-check 0.6s 0.5s ease forwards"/>
+        </svg>
+        <style>
+          @keyframes draw-check { to { stroke-dashoffset: 0; } }
+        </style>
       </div>
+      <div class="splash-text">
+        <span class="splash-title">Community Guardian</span>
+        <span class="splash-subtitle">THREAT INTELLIGENCE PLATFORM</span>
+      </div>
+      <div class="splash-scan"></div>
+      <span class="splash-status">Initializing security modules...</span>
     </div>
 
-    <div class="scan-noise" aria-hidden="true"></div>
-    <div class="angled-pattern" aria-hidden="true"></div>
+    <!-- Accent Bar (Cortex XSIAM) -->
+    <div class="accent-bar"></div>
 
-    <section class="brief-wrap">
-      <div class="brief-copy">
-        <p class="eyebrow">Community Guardian Console</p>
-        <h1>Signal First. Panic Last.</h1>
-        <p>
-          Ingest community threat feed events, prioritize risk, and respond with
-          calm, actionable checklists.
-        </p>
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-mark">
+          <!-- Shield — minimal stroke, blue accent -->
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"
+                  fill="rgba(59,130,246,0.06)" stroke="#3B82F6" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M9 12l2 2 4-4" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h1 class="header-title">Community Guardian</h1>
+        </div>
+        <span class="header-divider"></span>
+        <p class="header-subtitle">Threat Intelligence Dashboard</p>
       </div>
-      <div class="brief-metrics">
-        <article>
-          <span>Feed Events Available</span>
-          <strong id="metric-feed-events">--</strong>
-        </article>
-        <article>
-          <span>Active Incidents</span>
-          <strong id="metric-active">--</strong>
-        </article>
-        <article>
-          <span>High / Critical</span>
-          <strong id="metric-high-risk">--</strong>
-        </article>
-        <article>
-          <span>Next Priority</span>
-          <strong id="metric-next-priority">No pending incidents</strong>
-        </article>
+      <div class="header-right">
+        <select class="engine-select" id="engine-select" title="Analysis engine used for all operations">
+          <option value="auto">Auto</option>
+          <option value="ai">AI Only</option>
+          <option value="fallback">Fallback Only</option>
+        </select>
+        <span class="ai-status" id="ai-status">Checking...</span>
+      </div>
+    </header>
+
+    <!-- Stats Row -->
+    <section class="stats-row" id="stats-row">
+      <div class="stat-card">
+        <span class="stat-label">Total Incidents</span>
+        <span class="stat-value" id="stat-total">0</span>
+      </div>
+      <div class="stat-card stat-critical">
+        <span class="stat-label">
+          Critical / High
+          <span class="info-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="info-tooltip">Count of incidents classified as critical or high severity. These require immediate attention and should be triaged first.</span></span>
+        </span>
+        <span class="stat-value" id="stat-critical">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Categories</span>
+        <div class="stat-bars" id="stat-categories"></div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">
+          Avg Confidence
+          <span class="info-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="info-tooltip">Confidence score (0–100%) indicates how certain the analysis engine is about its classification. AI-powered analysis typically yields higher confidence. Scores below 60% suggest manual review is recommended.</span></span>
+        </span>
+        <div class="confidence-ring" id="stat-confidence">
+          <span class="confidence-value">--</span>
+        </div>
       </div>
     </section>
 
-    <main class="layout">
-      <section class="panel form-panel">
-        <h2>Source Feed Controls</h2>
-        <p class="block-note">
-          Primary mode: ingest synthetic incident feed and auto-triage each
-          event.
-        </p>
-        <div class="feed-actions">
-          <button id="import-feed">Import Feed Events</button>
-          <button id="import-reset" class="ghost">
-            Reset + Rebuild From Feed
-          </button>
+    <!-- Main Layout -->
+    <main class="main-layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <h2 class="section-title">Feed Import</h2>
+          <p class="section-desc">Ingest community safety events from the synthetic data feed for automated AI triage.</p>
+          <div class="feed-preview" id="feed-preview">
+            <span class="feed-count" id="feed-count">-- events available</span>
+          </div>
+          <div class="feed-actions">
+            <button class="btn btn-primary" id="btn-import">Import Feed Events</button>
+            <button class="btn btn-ghost" id="btn-reset-import">Reset &amp; Reimport</button>
+          </div>
+          <p class="message" id="feed-message"></p>
         </div>
-        <p id="feed-meta" class="message"></p>
 
-        <hr class="split" />
+        <hr class="divider" />
 
-        <h2>Operator Input (Optional)</h2>
-        <form id="incident-form">
-          <label>
-            Title
-            <input id="title" required minlength="3" maxlength="120" />
-          </label>
-          <label>
-            Description
-            <textarea
-              id="description"
-              required
-              minlength="10"
-              maxlength="2000"
-            ></textarea>
-          </label>
-          <label>
-            Location
-            <input id="location" required minlength="2" maxlength="120" />
-          </label>
-          <button type="submit">Analyze & Save</button>
-        </form>
-        <p id="form-message" class="message"></p>
-      </section>
+        <div class="sidebar-section">
+          <h2 class="section-title">Manual Report</h2>
+          <form id="incident-form">
+            <div class="form-group">
+              <label for="field-title">Title</label>
+              <input id="field-title" type="text" required minlength="3" maxlength="200" placeholder="Brief incident title" />
+            </div>
+            <div class="form-group">
+              <label for="field-desc">Description</label>
+              <textarea id="field-desc" required minlength="10" maxlength="5000" rows="3" placeholder="Describe the incident..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="field-location">Location</label>
+              <input id="field-location" type="text" required minlength="2" maxlength="200" placeholder="City or area" />
+            </div>
+            <button type="submit" class="btn btn-primary">Analyze &amp; Submit</button>
+          </form>
+          <p class="message" id="form-message"></p>
+        </div>
+      </aside>
 
-      <section class="panel list-panel">
-        <div class="panel-head">
-          <h2>Incident Digest</h2>
-          <button id="refresh">Refresh</button>
+      <!-- Incident List -->
+      <section class="incident-list-panel">
+        <div class="list-header">
+          <h2 class="section-title">Incident Digest</h2>
+          <button class="btn btn-ghost btn-sm" id="btn-refresh">Refresh</button>
         </div>
         <div class="filters">
-          <input
-            id="search"
-            placeholder="Search title, description, location"
-          />
-          <select id="status-filter">
+          <input type="search" id="filter-search" placeholder="Search incidents..." />
+          <select id="filter-status">
             <option value="">All Status</option>
             <option value="new">New</option>
             <option value="verified">Verified</option>
-            <option value="ignored">Ignored</option>
             <option value="resolved">Resolved</option>
+            <option value="dismissed">Dismissed</option>
           </select>
-          <select id="severity-filter">
+          <select id="filter-severity">
             <option value="">All Severity</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
+          <select id="filter-category">
+            <option value="">All Categories</option>
+            <option value="phishing">Phishing</option>
+            <option value="data_breach">Data Breach</option>
+            <option value="scam">Scam</option>
+            <option value="local_hazard">Local Hazard</option>
+            <option value="network_security">Network Security</option>
+            <option value="general">General</option>
+          </select>
         </div>
-        <div class="digest-workspace">
-          <div class="triage-board" id="triage-board">
-            <section class="lane">
-              <h3>New</h3>
-              <div id="lane-new" class="lane-list"></div>
-            </section>
-            <section class="lane">
-              <h3>Verified</h3>
-              <div id="lane-verified" class="lane-list"></div>
-            </section>
-            <section class="lane">
-              <h3>Ignored</h3>
-              <div id="lane-ignored" class="lane-list"></div>
-            </section>
-            <section class="lane">
-              <h3>Resolved</h3>
-              <div id="lane-resolved" class="lane-list"></div>
-            </section>
-          </div>
-
-          <aside class="detail-panel" id="detail-panel">
-            <p class="empty-detail" id="empty-detail">
-              Select an incident from any lane.
-            </p>
-            <div id="detail-content" class="detail-content hidden">
-              <div class="meta-row">
-                <span class="badge severity" id="detail-severity-badge"></span>
-                <span class="badge" id="detail-category"></span>
-                <span class="badge" id="detail-source"></span>
-                <span class="badge" id="detail-entry-mode"></span>
-              </div>
-              <h3 id="detail-title"></h3>
-              <p class="summary" id="detail-summary"></p>
-              <p class="description" id="detail-description"></p>
-              <p class="location" id="detail-location"></p>
-              <ol class="checklist" id="detail-checklist"></ol>
-
-              <div class="detail-controls">
-                <label>
-                  Status
-                  <select id="detail-status">
-                    <option value="new">New</option>
-                    <option value="verified">Verified</option>
-                    <option value="ignored">Ignored</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </label>
-                <label>
-                  Severity Override
-                  <select id="detail-severity">
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </label>
-              </div>
-              <div class="detail-actions">
-                <button id="detail-save">Save Changes</button>
-                <button id="detail-reanalyze" class="ghost">Reanalyze</button>
-              </div>
-              <p class="message" id="detail-message"></p>
-            </div>
-          </aside>
+        <div class="incident-list" id="incident-list">
+          <p class="empty-state">No incidents yet. Import feed events or submit a manual report to begin triage.</p>
         </div>
       </section>
+
+      <!-- Detail Panel -->
+      <aside class="detail-panel" id="detail-panel">
+        <div class="detail-empty" id="detail-empty">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" opacity="0.15">
+            <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>Select an incident to view details</p>
+        </div>
+        <div class="detail-content hidden" id="detail-content">
+          <div class="detail-badges" id="detail-badges"></div>
+          <h3 class="detail-title" id="detail-title"></h3>
+
+          <div class="detail-confidence" id="detail-confidence">
+            <span class="confidence-label">
+              Confidence
+              <span class="info-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span class="info-tooltip">How certain the analysis engine is about this classification. AI analysis uses LLM reasoning; fallback uses weighted keyword matching.</span></span>
+            </span>
+            <div class="confidence-bar-wrap">
+              <div class="confidence-bar" id="detail-confidence-bar"></div>
+            </div>
+            <span class="confidence-text" id="detail-confidence-text"></span>
+          </div>
+
+          <div class="detail-section">
+            <h4>Summary</h4>
+            <p id="detail-summary"></p>
+          </div>
+
+          <div class="detail-section">
+            <h4>Description</h4>
+            <p id="detail-description" class="detail-desc-text"></p>
+          </div>
+
+          <div class="detail-section">
+            <h4>Location</h4>
+            <p id="detail-location"></p>
+          </div>
+
+          <div class="detail-section">
+            <h4>Actionable Checklist</h4>
+            <ul class="checklist" id="detail-checklist"></ul>
+          </div>
+
+          <div class="detail-section">
+            <h4>Analysis Reasoning</h4>
+            <p class="reasoning-text" id="detail-reasoning"></p>
+          </div>
+
+          <div class="detail-section">
+            <h4>Timestamps</h4>
+            <p class="timestamps" id="detail-timestamps"></p>
+          </div>
+
+          <hr class="divider" />
+
+          <div class="detail-controls">
+            <div class="form-group">
+              <label for="detail-status">Status</label>
+              <select id="detail-status">
+                <option value="new">New</option>
+                <option value="verified">Verified</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="detail-severity">Severity</label>
+              <select id="detail-severity">
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <button class="btn btn-primary btn-sm" id="btn-save">Save Changes</button>
+            <button class="btn btn-ghost btn-sm" id="btn-reanalyze">Reanalyze</button>
+          </div>
+          <p class="message" id="detail-message"></p>
+        </div>
+      </aside>
     </main>
 
-    <template id="incident-template">
-      <article class="incident-card compact">
-        <div class="meta-row">
-          <span class="badge severity"></span>
-          <span class="badge category"></span>
-          <span class="badge source"></span>
-        </div>
-        <h3 class="title"></h3>
-        <p class="summary"></p>
-        <p class="location"></p>
-        <button class="open-detail">Open Incident</button>
-      </article>
-    </template>
+    <!-- Footer -->
+    <footer class="site-footer">
+      Created by <a href="https://github.com/Nikillanr" target="_blank" rel="noopener">Nikillanr</a>
+    </footer>
 
-    <script src="/static/js/app.js" defer></script>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
   </body>
 </html>

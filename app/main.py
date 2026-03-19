@@ -1,186 +1,246 @@
-import os
-import json
+"""FastAPI application — Community Guardian API routes."""
+
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.models import FeedImportRequest, Incident, IncidentCreate, IncidentUpdate
-from app.services.classifier import analyze_incident
-from app.services.datastore import DataStore
-from app.services.feed_ingest import import_feed_events
-
-load_dotenv()
+from app import config, database as db
+from app.models import (
+    FeedImportRequest,
+    Incident,
+    IncidentCreate,
+    IncidentUpdate,
+    ReanalyzeRequest,
+)
+from app.services import ai_pipeline, feed_service
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_PATH = BASE_DIR / "data" / "incidents.json"
-FEED_PATH = BASE_DIR / "data" / "feed_events.json"
 
-app = FastAPI(title="Community Guardian")
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    db.init_db()
+    yield
+
+
+app = FastAPI(title="Community Guardian", version="2.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-store = DataStore(str(DATA_PATH))
 
+
+# ── Pages ─────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+# ── Health ────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    ai_available = bool(config.GROQ_API_KEY) and config.AI_ENABLED
+    daily_limit = ai_pipeline._daily_limit_hit
+    return {"status": "ok", "ai_available": ai_available and not daily_limit, "daily_limit_hit": daily_limit}
 
 
-@app.get("/api/feed/preview")
-def preview_feed() -> dict:
-    if not FEED_PATH.exists():
-        raise HTTPException(status_code=404, detail="Feed file not found")
+# ── Stats ─────────────────────────────────────────────────────────────────
 
-    rows = json.loads(FEED_PATH.read_text(encoding="utf-8"))
-    if not isinstance(rows, list):
-        raise HTTPException(status_code=500, detail="Feed file format is invalid")
-
-    return {
-        "events_available": len(rows),
-        "sample": rows[:2],
-    }
+@app.get("/api/stats")
+def get_stats() -> dict:
+    return db.get_stats()
 
 
-@app.post("/api/feed/import")
-def import_feed(payload: FeedImportRequest) -> dict:
-    ai_enabled = os.getenv("AI_ENABLED", "true").lower() == "true"
-    existing = store.list_incidents()
+# ── Incidents CRUD ────────────────────────────────────────────────────────
 
-    try:
-        updated, imported = import_feed_events(
-            feed_path=FEED_PATH,
-            existing_incidents=existing,
-            ai_enabled=ai_enabled,
-            max_items=payload.max_items,
-            reset_existing=payload.reset_existing,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    store.save_incidents(updated)
-    return {
-        "imported": imported,
-        "total_incidents": len(updated),
-    }
-
-
-@app.get("/api/incidents", response_model=list[Incident])
+@app.get("/api/incidents")
 def list_incidents(
-    q: str | None = Query(default=None),
-    status: str | None = Query(default=None),
-    severity: str | None = Query(default=None),
-) -> list[Incident]:
-    incidents = store.list_incidents()
-
-    if q:
-        q_lower = q.lower()
-        incidents = [
-            i
-            for i in incidents
-            if q_lower in i.title.lower()
-            or q_lower in i.description.lower()
-            or q_lower in i.location.lower()
-        ]
-
-    if status:
-        incidents = [i for i in incidents if i.status == status]
-
-    if severity:
-        incidents = [i for i in incidents if i.severity == severity]
-
-    severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-    incidents.sort(key=lambda i: severity_rank[i.severity], reverse=True)
-    return incidents
-
-
-@app.post("/api/incidents", response_model=Incident, status_code=201)
-def create_incident(payload: IncidentCreate) -> Incident:
-    incidents = store.list_incidents()
-    next_id = max([i.id for i in incidents], default=0) + 1
-
-    ai_enabled = os.getenv("AI_ENABLED", "true").lower() == "true"
-    analysis = analyze_incident(
-        title=payload.title,
-        description=payload.description,
-        ai_enabled=ai_enabled,
+    search: str = Query(default=""),
+    status: str = Query(default=""),
+    severity: str = Query(default=""),
+    category: str = Query(default=""),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    incidents, total = db.get_incidents(
+        search=search, status=status, severity=severity,
+        category=category, limit=limit, offset=offset,
     )
+    return {"incidents": incidents, "total": total}
 
-    incident = Incident(
-        id=next_id,
+
+@app.post("/api/incidents", status_code=201)
+async def create_incident(payload: IncidentCreate) -> dict:
+    analysis = await ai_pipeline.analyze(
         title=payload.title,
         description=payload.description,
         location=payload.location,
-        category=analysis["category"],
-        severity=analysis["severity"],
-        status="new",
-        summary=analysis["summary"],
-        checklist=analysis["checklist"],
-        source=analysis["source"],
+        use_ai=payload.use_ai,
+    )
+    incident = db.insert_incident(
+        title=payload.title,
+        description=payload.description,
+        location=payload.location,
+        category=analysis.category,
+        severity=analysis.severity,
+        confidence=analysis.confidence,
+        summary=analysis.summary,
+        checklist=analysis.checklist,
+        source=analysis.source,
+        reasoning=analysis.reasoning,
         entry_mode="manual",
     )
-
-    incidents.append(incident)
-    store.save_incidents(incidents)
     return incident
 
 
-@app.put("/api/incidents/{incident_id}", response_model=Incident)
-def update_incident(incident_id: int, payload: IncidentUpdate) -> Incident:
-    incidents = store.list_incidents()
+@app.put("/api/incidents/{incident_id}")
+def update_incident(incident_id: int, payload: IncidentUpdate) -> dict:
+    existing = db.get_incident(incident_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Incident not found")
 
-    if payload.status is None and payload.severity is None:
-        raise HTTPException(status_code=400, detail="At least one field must be updated")
+    updates = {}
+    if payload.status is not None:
+        updates["status"] = payload.status
+    if payload.severity is not None:
+        updates["severity"] = payload.severity
 
-    for idx, incident in enumerate(incidents):
-        if incident.id == incident_id:
-            updates: dict = {}
-            if payload.status is not None:
-                updates["status"] = payload.status
-            if payload.severity is not None:
-                updates["severity"] = payload.severity
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
 
-            updated = incident.model_copy(update=updates)
-            incidents[idx] = updated
-            store.save_incidents(incidents)
-            return updated
-
-    raise HTTPException(status_code=404, detail="Incident not found")
+    result = db.update_incident(incident_id, **updates)
+    return result
 
 
-@app.post("/api/incidents/{incident_id}/reanalyze", response_model=Incident)
-def reanalyze_incident(incident_id: int) -> Incident:
-    incidents = store.list_incidents()
-    ai_enabled = os.getenv("AI_ENABLED", "true").lower() == "true"
+@app.post("/api/incidents/{incident_id}/reanalyze")
+async def reanalyze_incident(incident_id: int, payload: ReanalyzeRequest = None) -> dict:
+    existing = db.get_incident(incident_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Incident not found")
 
-    for idx, incident in enumerate(incidents):
-        if incident.id == incident_id:
-            analysis = analyze_incident(
-                title=incident.title,
-                description=incident.description,
-                ai_enabled=ai_enabled,
+    use_ai = payload.use_ai if payload else None
+    analysis = await ai_pipeline.analyze(
+        title=existing["title"],
+        description=existing["description"],
+        location=existing["location"],
+        use_ai=use_ai,
+    )
+    result = db.reanalyze_incident(
+        incident_id=incident_id,
+        category=analysis.category,
+        severity=analysis.severity,
+        confidence=analysis.confidence,
+        summary=analysis.summary,
+        checklist=analysis.checklist,
+        source=analysis.source,
+        reasoning=analysis.reasoning,
+    )
+    return result
+
+
+# ── Feed ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/feed/preview")
+def preview_feed() -> dict:
+    return feed_service.get_preview()
+
+
+@app.post("/api/feed/import")
+async def import_feed(payload: FeedImportRequest) -> dict:
+    events = feed_service.load_events()
+    if not events:
+        raise HTTPException(status_code=404, detail="No feed events found")
+
+    if payload.reset_existing:
+        deleted = db.delete_feed_incidents()
+
+    # Determine if we need API pacing (Groq free-tier rate limits)
+    needs_ai = payload.use_ai is not False and ai_pipeline._ai_available()
+
+    # Reanalyze manual incidents whose source doesn't match the selected engine
+    reanalyzed = 0
+    if payload.use_ai is False:
+        # Forced fallback — reanalyze any manual incidents that used AI
+        for inc in db.get_manual_incidents_by_source("ai"):
+            try:
+                analysis = await ai_pipeline.analyze(
+                    title=inc["title"], description=inc["description"],
+                    location=inc["location"], use_ai=False,
+                )
+                db.reanalyze_incident(
+                    incident_id=inc["id"], category=analysis.category,
+                    severity=analysis.severity, confidence=analysis.confidence,
+                    summary=analysis.summary, checklist=analysis.checklist,
+                    source=analysis.source, reasoning=analysis.reasoning,
+                )
+                reanalyzed += 1
+            except Exception:
+                pass
+    elif needs_ai:
+        # AI mode or auto with AI available — reanalyze fallback manual incidents
+        for inc in db.get_manual_incidents_by_source("fallback"):
+            try:
+                analysis = await ai_pipeline.analyze(
+                    title=inc["title"], description=inc["description"],
+                    location=inc["location"], use_ai=True,
+                )
+                db.reanalyze_incident(
+                    incident_id=inc["id"], category=analysis.category,
+                    severity=analysis.severity, confidence=analysis.confidence,
+                    summary=analysis.summary, checklist=analysis.checklist,
+                    source=analysis.source, reasoning=analysis.reasoning,
+                )
+                reanalyzed += 1
+                await asyncio.sleep(0.5)
+            except Exception:
+                pass
+
+    # Limit events
+    events = events[: payload.max_items]
+
+    imported = 0
+    for ev in events:
+        # Skip duplicates
+        if db.check_duplicate(ev.title, ev.location):
+            continue
+
+        try:
+            analysis = await ai_pipeline.analyze(
+                title=ev.title,
+                description=ev.description,
+                location=ev.location,
+                use_ai=payload.use_ai,
             )
-            updated = incident.model_copy(
-                update={
-                    "category": analysis["category"],
-                    "severity": analysis["severity"],
-                    "summary": analysis["summary"],
-                    "checklist": analysis["checklist"],
-                    "source": analysis["source"],
-                }
+        except Exception:
+            # AI failed hard — fall back to classifier so we don't lose the event
+            analysis = await ai_pipeline.analyze(
+                title=ev.title, description=ev.description,
+                location=ev.location, use_ai=False,
             )
-            incidents[idx] = updated
-            store.save_incidents(incidents)
-            return updated
+        db.insert_incident(
+            title=ev.title,
+            description=ev.description,
+            location=ev.location,
+            category=analysis.category,
+            severity=analysis.severity,
+            confidence=analysis.confidence,
+            summary=analysis.summary,
+            checklist=analysis.checklist,
+            source=analysis.source,
+            reasoning=analysis.reasoning,
+            entry_mode="feed",
+            raw_event=ev.model_dump(),
+            created_at=ev.reported_at or None,
+        )
+        imported += 1
+        # Pace API calls to stay within Groq free-tier rate limits
+        if needs_ai and imported < len(events):
+            await asyncio.sleep(0.5)
 
-    raise HTTPException(status_code=404, detail="Incident not found")
+    total = db.get_stats()["total"]
+    return {"imported": imported, "reanalyzed": reanalyzed, "total_incidents": total}
