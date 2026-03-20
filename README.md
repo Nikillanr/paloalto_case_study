@@ -1,6 +1,6 @@
 # Community Guardian - Palo Alto Networks Case Study
 
-**Candidate Name:** Nikillan
+**Candidate Name:** Nikillan Rajesh
 **Scenario Chosen:** 3 - Community Safety & Digital Wellness
 **Estimated Time Spent:** ~6 hours
 
