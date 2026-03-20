@@ -33,7 +33,10 @@
   function formatDate(iso) {
     if (!iso) return "--";
     const d = new Date(iso);
-    return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+    return d.toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
   }
 
   // ── Global Engine Setting ────────────────────────────────────────
@@ -66,7 +69,10 @@
     el.className = "message " + type;
     toast(text, type);
     if (type === "success" || type === "info") {
-      setTimeout(() => { el.textContent = ""; el.className = "message"; }, 4000);
+      setTimeout(() => {
+        el.textContent = "";
+        el.className = "message";
+      }, 4000);
     }
   }
 
@@ -77,7 +83,10 @@
     const from = parseInt(el.textContent) || 0;
     const diff = target - from;
 
-    if (diff === 0) { el.textContent = target; return; }
+    if (diff === 0) {
+      el.textContent = target;
+      return;
+    }
 
     function frame(now) {
       const elapsed = now - start;
@@ -103,13 +112,18 @@
       });
       clearTimeout(timeoutId);
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Request failed" }));
+        const err = await res
+          .json()
+          .catch(() => ({ detail: "Request failed" }));
         throw new Error(err.detail || `HTTP ${res.status}`);
       }
       return res.json();
     } catch (e) {
       clearTimeout(timeoutId);
-      if (e.name === "AbortError") throw new Error("Request timed out — try again or switch to Fallback mode");
+      if (e.name === "AbortError")
+        throw new Error(
+          "Request timed out — try again or switch to Fallback mode",
+        );
       throw e;
     }
   }
@@ -121,7 +135,8 @@
 
       // Count-up animation on stat numbers
       animateCountUp($("#stat-total"), stats.total);
-      const critHigh = (stats.by_severity.critical || 0) + (stats.by_severity.high || 0);
+      const critHigh =
+        (stats.by_severity.critical || 0) + (stats.by_severity.high || 0);
       animateCountUp($("#stat-critical"), critHigh);
 
       // Category bars — render at 0 width, then animate
@@ -132,15 +147,18 @@
         .slice(0, 5);
 
       catEl.innerHTML = entries
-        .map(([cat, count]) => `
+        .map(
+          ([cat, count]) => `
           <div class="stat-bar-row">
             <span class="stat-bar-label">${esc(formatCategory(cat))}</span>
             <div class="stat-bar-track">
-              <div class="stat-bar-fill" data-width="${(count / maxCat * 100)}"></div>
+              <div class="stat-bar-fill" data-width="${(count / maxCat) * 100}"></div>
             </div>
             <span class="stat-bar-count">${count}</span>
           </div>
-        `).join("");
+        `,
+        )
+        .join("");
 
       // Trigger bar animation after a frame (so 0→target transition plays)
       requestAnimationFrame(() => {
@@ -151,9 +169,10 @@
 
       // Confidence
       const conf = stats.avg_confidence;
-      $(".confidence-value").textContent = conf > 0 ? (conf * 100).toFixed(0) + "%" : "--";
-      $(".confidence-value").style.color = conf > 0 ? confidenceColor(conf) : "";
-
+      $(".confidence-value").textContent =
+        conf > 0 ? (conf * 100).toFixed(0) + "%" : "--";
+      $(".confidence-value").style.color =
+        conf > 0 ? confidenceColor(conf) : "";
     } catch (e) {
       console.error("Stats load failed:", e);
     }
@@ -185,19 +204,23 @@
     const list = $("#incident-list");
 
     if (incidents.length === 0) {
-      list.innerHTML = '<p class="empty-state">No incidents found. Import feed events or submit a manual report to begin triage.</p>';
+      list.innerHTML =
+        '<p class="empty-state">No incidents found. Import feed events or submit a manual report to begin triage.</p>';
       keyboardIdx = -1;
       return;
     }
 
     // Staggered card animation: set --card-delay per card (30ms each)
-    list.innerHTML = incidents.map((inc, i) => `
-      <div class="incident-card severity-${esc(inc.severity)} ${inc.id === selectedId ? 'active' : ''}"
+    list.innerHTML = incidents
+      .map(
+        (inc, i) => `
+      <div class="incident-card severity-${esc(inc.severity)} ${inc.id === selectedId ? "active" : ""}"
            data-id="${inc.id}" data-index="${i}" style="--card-delay: ${i * 30}ms">
         <div class="card-header">
           <span class="badge badge-${esc(inc.severity)}">${esc(inc.severity)}</span>
           <span class="badge badge-category">${esc(formatCategory(inc.category))}</span>
           <span class="badge badge-${esc(inc.source)}">${esc(inc.source)}</span>
+          <span class="badge badge-${esc(inc.entry_mode)}">${esc(inc.entry_mode)}</span>
           <span class="badge badge-status">${esc(inc.status)}</span>
         </div>
         <div class="card-title">${esc(inc.title)}</div>
@@ -207,7 +230,9 @@
           <span class="card-confidence">${(inc.confidence * 100).toFixed(0)}%</span>
         </div>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
 
     // Click handlers
     list.querySelectorAll(".incident-card").forEach((card) => {
@@ -227,7 +252,10 @@
       const id = parseInt(card.dataset.id);
       const idx = parseInt(card.dataset.index);
       card.classList.toggle("active", id === selectedId);
-      card.classList.toggle("keyboard-focus", idx === keyboardIdx && id !== selectedId);
+      card.classList.toggle(
+        "keyboard-focus",
+        idx === keyboardIdx && id !== selectedId,
+      );
     });
   }
 
@@ -248,8 +276,8 @@
       <span class="badge badge-${esc(inc.severity)}">${esc(inc.severity)}</span>
       <span class="badge badge-category">${esc(formatCategory(inc.category))}</span>
       <span class="badge badge-${esc(inc.source)}">${esc(inc.source)} analysis</span>
+      <span class="badge badge-${esc(inc.entry_mode)}">${esc(inc.entry_mode)}</span>
       <span class="badge badge-status">${esc(inc.status)}</span>
-      <span class="badge badge-status">${esc(inc.entry_mode)}</span>
     `;
 
     $("#detail-title").textContent = inc.title;
@@ -272,7 +300,9 @@
 
     // Checklist — clickable items
     const cl = $("#detail-checklist");
-    cl.innerHTML = inc.checklist.map((item) => `<li>${esc(item)}</li>`).join("");
+    cl.innerHTML = inc.checklist
+      .map((item) => `<li>${esc(item)}</li>`)
+      .join("");
     cl.querySelectorAll("li").forEach((li) => {
       li.addEventListener("click", () => li.classList.toggle("checked"));
     });
@@ -343,8 +373,15 @@
       const useAi = getUseAi();
       if (useAi !== null) body.use_ai = useAi;
 
-      const inc = await api("/incidents", { method: "POST", body: JSON.stringify(body) });
-      showMsg(msg, `Incident #${inc.id} created (${inc.source} analysis, ${inc.category})`, "success");
+      const inc = await api("/incidents", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      showMsg(
+        msg,
+        `Incident #${inc.id} created (${inc.source} analysis, ${inc.category})`,
+        "success",
+      );
       e.target.reset();
       await refresh();
     } catch (err) {
@@ -360,7 +397,8 @@
     const msg = $("#feed-message");
     btn.disabled = true;
     const useAi = getUseAi();
-    const aiActive = useAi !== false && $("#ai-status").classList.contains("online");
+    const aiActive =
+      useAi !== false && $("#ai-status").classList.contains("online");
     btn.innerHTML = aiActive
       ? 'AI Analyzing...<span class="spinner"></span>'
       : 'Importing...<span class="spinner"></span>';
@@ -373,7 +411,11 @@
         method: "POST",
         body: JSON.stringify(body),
       });
-      showMsg(msg, `Imported ${data.imported} events${data.reanalyzed ? `, reanalyzed ${data.reanalyzed} manual` : ''} (${data.total_incidents} total)`, "success");
+      showMsg(
+        msg,
+        `Imported ${data.imported} events${data.reanalyzed ? `, reanalyzed ${data.reanalyzed} manual` : ""} (${data.total_incidents} total)`,
+        "success",
+      );
       await refresh();
     } catch (err) {
       showMsg(msg, err.message, "error");
@@ -394,7 +436,10 @@
         status: $("#detail-status").value,
         severity: $("#detail-severity").value,
       };
-      await api(`/incidents/${selectedId}`, { method: "PUT", body: JSON.stringify(body) });
+      await api(`/incidents/${selectedId}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      });
       showMsg(msg, "Updated successfully", "success");
       await refresh();
     } catch (err) {

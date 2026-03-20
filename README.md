@@ -126,7 +126,7 @@ FastAPI Application
 
 ## Demo Video (5-7 mins)
 
-Video Link: TODO
+Video Link: https://youtu.be/VhpQhKXPbto
 
 ## Repository Structure
 
