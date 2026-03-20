@@ -34,7 +34,7 @@ This problem directly mirrors what Palo Alto Networks solves at enterprise scale
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env to add your Groq API key (free at console.groq.com)
-uvicorn app.main:app
+./start.sh
 ```
 
 Open: http://127.0.0.1:8000
@@ -65,7 +65,7 @@ FastAPI Application
 |--------|----------|-------------|
 | GET | `/health` | Health check + AI availability + daily limit status |
 | GET | `/api/stats` | Dashboard statistics (totals, breakdowns, avg confidence) |
-| GET | `/api/incidents` | List incidents with search, status/severity filters, pagination |
+| GET | `/api/incidents` | List incidents with search, status/severity/category filters, pagination |
 | POST | `/api/incidents` | Create and analyze a new incident |
 | PUT | `/api/incidents/{id}` | Update status or severity |
 | POST | `/api/incidents/{id}/reanalyze` | Re-run AI/fallback analysis |
@@ -152,4 +152,6 @@ templates/
 tests/
   test_api.py            # API endpoint tests (11 tests)
   test_classifier.py     # Classifier unit tests (10 tests)
+start.sh                 # One-shot launcher (clean DB + start server)
+CONTEXT.md               # Full project context for LLM assistants
 ```
