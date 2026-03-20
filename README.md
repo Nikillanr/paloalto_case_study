@@ -28,9 +28,11 @@ This problem directly mirrors what Palo Alto Networks solves at enterprise scale
 
 - Python 3.9+
 
-### Run Commands
+### Setup & Run
 
 ```bash
+git clone https://github.com/Nikillanr/paloalto_case_study.git
+cd paloalto_case_study
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env to add your Groq API key (free at console.groq.com)
@@ -38,6 +40,8 @@ cp .env.example .env
 ```
 
 Open: http://127.0.0.1:8000
+
+> **No API key?** The app works fully without one — it automatically uses the fallback classifier for all analysis. Add a Groq key to enable AI-powered analysis.
 
 ### Test Commands
 
