@@ -196,7 +196,6 @@ async def import_feed(payload: FeedImportRequest) -> dict:
                     source=analysis.source, reasoning=analysis.reasoning,
                 )
                 reanalyzed += 1
-                await asyncio.sleep(0.5)
             except Exception:
                 pass
 
@@ -238,9 +237,6 @@ async def import_feed(payload: FeedImportRequest) -> dict:
             created_at=ev.reported_at or None,
         )
         imported += 1
-        # Pace API calls to stay within Groq free-tier rate limits
-        if needs_ai and imported < len(events):
-            await asyncio.sleep(0.5)
 
     total = db.get_stats()["total"]
     return {"imported": imported, "reanalyzed": reanalyzed, "total_incidents": total}
